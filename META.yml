@@ -1,0 +1,27 @@
+---
+abstract: "interface to Linux's C<NETLINK_ROUTE> netlink\nsocket protocol"
+author:
+  - 'Paul Evans <leonerd@leonerd.org.uk>'
+build_requires:
+  Module::Build: 0
+  Test::More: 0
+configure_requires:
+  Module::Build: 0
+generated_by: 'Module::Build version 0.3601'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Socket-Netlink-Route
+provides:
+  IO::Socket::Netlink::Route:
+    file: lib/IO/Socket/Netlink/Route.pm
+    version: 0.01
+  Socket::Netlink::Route:
+    file: lib/Socket/Netlink/Route.pm
+    version: 0.01
+requires:
+  Socket::Netlink: 0
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.01
