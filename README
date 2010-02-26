@@ -9,7 +9,7 @@ DESCRIPTION
     interface to this protocol instead; see IO::Socket::Netlink::Route.
 
     For more information, see the Linux kernel documentation about the
-    "NETLINK_ROUTE" protcol family in rtnetlink(7)
+    "NETLINK_ROUTE" protocol family in rtnetlink(7)
 
      $ man 7 rtnetlink
 

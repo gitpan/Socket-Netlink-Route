@@ -7,9 +7,10 @@ package IO::Socket::Netlink::Route;
 
 use strict;
 use warnings;
+use IO::Socket::Netlink 0.03;
 use base qw( IO::Socket::Netlink );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 
@@ -96,20 +97,33 @@ sub unpack_nlattr_mac { join ":", map sprintf("%02x",ord($_)), split //, $_[1] }
 sub   pack_nlattr_dottedhex { die "TODO" }
 sub unpack_nlattr_dottedhex { "0x" . join ".", map sprintf("%02x",ord($_)), split //, $_[1] }
 
-use Socket6 qw( inet_ntop );
+if( eval { require Socket6 } ) {
+   *inet_ntop = \&Socket6::inet_ntop;
+}
+else {
+   require Socket;
+   *inet_ntop = sub {
+      my ( $family, $addr ) = @_;
+      return Socket::inet_ntoa($addr) if $family == Socket::AF_INET();
+      return undef;
+   };
+}
 
 sub pack_nlattr_protaddr { die "TODO" }
 sub unpack_nlattr_protaddr
 {
    my ( $self, $addr ) = @_;
-   eval { defined $self->ifa_family and inet_ntop( $self->ifa_family, $addr ) }
+   eval { defined $self->family and inet_ntop( $self->family, $addr ) }
       or $self->unpack_nlattr_dottedhex( $addr );
 }
 
 package IO::Socket::Netlink::Route::_IfinfoMsg;
 
 use base qw( IO::Socket::Netlink::Route::_Message );
-use Socket::Netlink::Route qw( :DEFAULT pack_ifinfomsg unpack_ifinfomsg );
+use Socket::Netlink::Route qw( :DEFAULT
+   pack_ifinfomsg unpack_ifinfomsg
+   pack_net_device_stats unpack_net_device_stats
+);
 use Socket qw( AF_UNSPEC );
 
 =head2 IfinfoMsg
@@ -198,15 +212,23 @@ __PACKAGE__->has_nlattrs(
    ifname    => [ IFLA_IFNAME,    "asciiz" ],
    mtu       => [ IFLA_MTU,       "u32" ],
    qdisc     => [ IFLA_QDISC,     "asciiz" ],
+   stats     => [ IFLA_STATS,     "stats" ],
    txqlen    => [ IFLA_TXQLEN,    "u32" ],
    operstate => [ IFLA_OPERSTATE, "u8" ],
    linkmode  => [ IFLA_LINKMODE,  "u8" ],
 );
 
+sub   pack_nlattr_stats {   pack_net_device_stats $_[1] }
+sub unpack_nlattr_stats { unpack_net_device_stats $_[1] }
+
 package IO::Socket::Netlink::Route::_IfaddrMsg;
 
 use base qw( IO::Socket::Netlink::Route::_Message );
-use Socket::Netlink::Route qw( :DEFAULT pack_ifaddrmsg unpack_ifaddrmsg );
+use Carp;
+use Socket::Netlink::Route qw( :DEFAULT 
+   pack_ifaddrmsg unpack_ifaddrmsg
+   pack_ifa_cacheinfo unpack_ifa_cacheinfo
+);
 
 =head2 IfaddrMsg
 
@@ -262,6 +284,8 @@ __PACKAGE__->is_header(
    unpack => \&unpack_ifaddrmsg,
 );
 
+*family = \&ifa_family;
+
 =pod
 
 Provides the following netlink attributes
@@ -278,6 +302,8 @@ Provides the following netlink attributes
 
 =item * anycast => STRING
 
+=item * cacheinfo => HASH
+
 =back
 
 =cut
@@ -289,11 +315,40 @@ __PACKAGE__->has_nlattrs(
    label     => [ IFA_LABEL,     "asciiz" ],
    broadcast => [ IFA_BROADCAST, "protaddr" ],
    anycast   => [ IFA_ANYCAST,   "protaddr" ],
+   cacheinfo => [ IFA_CACHEINFO, "cacheinfo" ],
 );
+
+sub   pack_nlattr_cacheinfo {   pack_ifa_cacheinfo $_[1] }
+sub unpack_nlattr_cacheinfo { unpack_ifa_cacheinfo $_[1] }
+
+=head3 $message->prefix
+
+Sets or returns both the C<address> netlink attribute, and the
+C<ifa_prefixlen> header value, in the form
+
+ address/ifa_prefixlen
+
+=cut
+
+sub prefix
+{
+   my $self = shift;
+
+   if( @_ ) {
+      my ( $addr, $len ) = $_[0] =~ m{^(.*)/(\d+)$} or
+         croak "Expected 'ADDRESS/PREFIXLEN'";
+      $self->set_nlattrs( address => $addr );
+      $self->ifa_prefixlen( $len );
+   }
+   else {
+      sprintf "%s/%d", $self->get_nlattr( 'address' ), $self->ifa_prefixlen;
+   }
+}
 
 package IO::Socket::Netlink::Route::_RtMsg;
 
 use base qw( IO::Socket::Netlink::Route::_Message );
+use Carp;
 use Socket::Netlink::Route qw( :DEFAULT pack_rtmsg unpack_rtmsg );
 
 =head2 RtMsg
@@ -361,6 +416,8 @@ __PACKAGE__->is_header(
    unpack => \&unpack_rtmsg,
 );
 
+*family = \&rtm_family;
+
 =pod
 
 Provides the following netlink attributes
@@ -387,8 +444,8 @@ Provides the following netlink attributes
 
 __PACKAGE__->has_nlattrs(
    "rtm",
-   dst      => [ RTA_DST,      "protprefix_dst" ],
-   src      => [ RTA_SRC,      "protprefix_src" ],
+   dst      => [ RTA_DST,      "protaddr" ],
+   src      => [ RTA_SRC,      "protaddr" ],
    iif      => [ RTA_IIF,      "u32" ],
    oif      => [ RTA_OIF,      "u32" ],
    gateway  => [ RTA_GATEWAY,  "protaddr" ],
@@ -396,29 +453,142 @@ __PACKAGE__->has_nlattrs(
    metrics  => [ RTA_METRICS,  "u32" ],
 );
 
-use Socket6 qw( inet_ntop );
+=head3 $message->src
 
-sub pack_nlattr_protaddr { die "TODO" }
-sub unpack_nlattr_protaddr
+Sets or returns the C<src> netlink attribute and the C<rtm_src_len> header
+value, in the form
+
+ address/prefixlen
+
+if the address is defined, or C<undef> if not.
+
+=head3 $message->dst
+
+Sets or returns the C<dst> netlink attribute and the C<rtm_dst_len> header
+value, in the form given above.
+
+=cut
+
+sub _srcdst
 {
-   my ( $self, $addr ) = @_;
-   eval { defined $self->rtm_family and inet_ntop( $self->rtm_family, $addr ) }
-      or $self->unpack_nlattr_dottedhex( $addr );
+   my $self = shift;
+   my $type = shift;
+
+   my $rtm_len = "rtm_${type}_len";
+
+   if( @_ ) {
+      if( defined $_[0] ) {
+         my ( $addr, $len ) = $_[0] =~ m{^(.*)/(\d+)$} or
+            croak "Expected 'ADDRESS/PREFIXLEN'";
+         $self->set_nlattrs( $type => $addr );
+         $self->$rtm_len( $len );
+      }
+      else {
+         $self->set_nlattrs( $type => undef );
+         $self->$rtm_len( 0 );
+      }
+   }
+   else {
+      if( defined( my $addr = $self->get_nlattr( $type ) ) ) {
+         sprintf "%s/%d", $addr, $self->$rtm_len;
+      }
+      else {
+         undef;
+      }
+   }
 }
 
-sub pack_nlattr_protprefix_dst { die "TODO" }
-sub unpack_nlattr_protprefix_dst
-{
-   my ( $self, $addr ) = @_;
-   sprintf "%s/%d", $self->unpack_nlattr_protaddr( $addr ), $self->rtm_dst_len;
-}
+sub src { shift->_srcdst('src',@_) }
+sub dst { shift->_srcdst('dst',@_) }
 
-sub pack_nlattr_protprefix_src { die "TODO" }
-sub unpack_nlattr_protprefix_src
-{
-   my ( $self, $addr ) = @_;
-   sprintf "%s/%d", $self->unpack_nlattr_protaddr( $addr ), $self->rtm_src_len;
-}
+package IO::Socket::Netlink::Route::_NdMsg;
+
+use base qw( IO::Socket::Netlink::Route::_Message );
+use Socket::Netlink::Route qw( :DEFAULT
+   pack_ndmsg unpack_ndmsg
+   pack_nda_cacheinfo unpack_nda_cacheinfo
+);
+
+=head2 NdMsg
+
+Relates to a neighbour discovery table entry. Used by the following message types
+
+=over 4
+
+=item * RTM_NEWNEIGH
+
+=item * RTM_DELNEIGH
+
+=item * RTM_GETNEIGH
+
+=back
+
+=cut
+
+__PACKAGE__->register_nlmsg_type( $_ )
+   for RTM_NEWNEIGH, RTM_DELNEIGH, RTM_GETNEIGH;
+
+=pod
+
+Provides the following header field accessors
+
+=over 4
+
+=item * ndm_family
+
+=item * ndm_ifindex
+
+=item * ndm_state
+
+=item * ndm_flags
+
+=item * ndm_type
+
+=back
+
+=cut
+
+__PACKAGE__->is_header(
+   data => "nlmsg",
+   fields => [
+      [ ndm_family  => "decimal" ],
+      [ ndm_ifindex => "decimal" ],
+      [ ndm_state   => "decimal" ],
+      [ ndm_flags   => "hex" ],
+      [ ndm_type    => "decimal" ],
+      [ ndm         => "bytes" ],
+   ],
+   pack   => \&pack_ndmsg,
+   unpack => \&unpack_ndmsg,
+);
+
+*family = \&ndm_family;
+
+=pod
+
+Provides the following netlink attributes
+
+=over 4
+
+=item * dst => STRING
+
+=item * lladdr => STRING
+
+=item * cacheinfo => HASH
+
+=back
+
+=cut
+
+__PACKAGE__->has_nlattrs(
+   "ndm",
+   dst       => [ NDA_DST,       "protaddr" ],
+   lladdr    => [ NDA_LLADDR,    "mac" ],
+   cacheinfo => [ NDA_CACHEINFO, "cacheinfo" ],
+);
+
+sub   pack_nlattr_cacheinfo {   pack_nda_cacheinfo $_[1] }
+sub unpack_nlattr_cacheinfo { unpack_nda_cacheinfo $_[1] }
 
 # Keep perl happy; keep Britain tidy
 1;

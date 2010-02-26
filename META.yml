@@ -3,11 +3,12 @@ abstract: "interface to Linux's C<NETLINK_ROUTE> netlink\nsocket protocol"
 author:
   - 'Paul Evans <leonerd@leonerd.org.uk>'
 build_requires:
+  ExtUtils::H2PM: 0.04
   Module::Build: 0
   Test::More: 0
 configure_requires:
   Module::Build: 0
-generated_by: 'Module::Build version 0.3601'
+generated_by: 'Module::Build version 0.3603'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -16,12 +17,14 @@ name: Socket-Netlink-Route
 provides:
   IO::Socket::Netlink::Route:
     file: lib/IO/Socket/Netlink/Route.pm
-    version: 0.01
+    version: 0.02
   Socket::Netlink::Route:
     file: lib/Socket/Netlink/Route.pm
-    version: 0.01
+    version: 0.02
+recommends:
+  Socket6: 0
 requires:
-  Socket::Netlink: 0
+  Socket::Netlink: 0.03
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.01
+version: 0.02

@@ -8,7 +8,7 @@ package Socket::Netlink::Route;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Exporter 'import';
 
@@ -27,7 +27,7 @@ family. It is suggested to use the high-level object interface to this
 protocol instead; see L<IO::Socket::Netlink::Route>.
 
 For more information, see the Linux kernel documentation about the
-C<NETLINK_ROUTE> protcol family in F<rtnetlink(7)>
+C<NETLINK_ROUTE> protocol family in F<rtnetlink(7)>
 
  $ man 7 rtnetlink
 

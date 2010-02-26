@@ -16,7 +16,7 @@ my $rtnlsock = IO::Socket::Netlink::Route->new
 my @messages;
 
 $rtnlsock->send_nlmsg( $rtnlsock->new_request(
-      nlmsg_type  => RTM_GETLINK, 
+      nlmsg_type  => RTM_GETNEIGH, 
       nlmsg_flags => NLM_F_DUMP,
 ) );
 
@@ -28,12 +28,12 @@ foreach my $message ( @messages ) {
       $! = -(unpack "i!", $message->nlmsg)[0];
       print "Got error $!\n";
    }
-   elsif( $message->nlmsg_type == RTM_NEWLINK ) {
+   elsif( $message->nlmsg_type == RTM_NEWNEIGH ) {
       printf "Got reply type=%d flags=%04x seq=%d pid=%d\n",
          $message->nlmsg_type, $message->nlmsg_flags, $message->nlmsg_seq, $message->nlmsg_pid;
 
-      printf "  type=%d index=%d flags=%04x change=%04x; rtattrs:\n",
-         $message->ifi_type, $message->ifi_index, $message->ifi_flags, $message->ifi_change;
+      printf "  family=%d ifindex=%d state=%d flags=%04x type=%d\n",
+         $message->ndm_family, $message->ndm_ifindex, $message->ndm_state, $message->ndm_flags, $message->ndm_type;
 
       print pp( $message->nlattrs ) . "\n";
    }

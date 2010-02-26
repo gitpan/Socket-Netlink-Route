@@ -1,5 +1,16 @@
 Revision history for Socket-Netlink-Route
 
+0.02    ADDITIONS:
+         * Direct accessors for IfaddrMsg's prefix and RtMsg's src and dst
+         * RTM_{NEW,DEL,GET}NEIGH and associated message class
+         * Multicast group constants
+
+        CHANGES:
+         * Don't hard-depend on Socket6; just use it if it's available
+
+        BUGFIXES:
+         * Declare build_requires ExtUtils::H2PM
+
 0.01    First version, released on an unsuspecting world.
 
 

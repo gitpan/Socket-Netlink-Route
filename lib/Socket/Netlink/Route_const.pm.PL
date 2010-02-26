@@ -3,13 +3,15 @@
 use strict;
 use warnings;
 
-use ExtUtils::H2PM 0.03;
+use ExtUtils::H2PM 0.04;
 
 module "Socket::Netlink::Route";
 
 include "sys/socket.h";
 include "linux/netlink.h";
 include "linux/rtnetlink.h";
+
+include "linux/netdevice.h"; # for struct net_device_stats
 
 use_export;
 
@@ -34,6 +36,20 @@ constant "IFLA_$_" for qw( UNSPEC ADDRESS BROADCAST IFNAME MTU LINK QDISC
    STATS COST PRIORITY MASTER WIRELESS PROTINFO TXQLEN MAP WEIGHT OPERSTATE
    LINKMODE LINKINFO NET_NS_PID IFALIAS );
 
+structure "struct net_device_stats",
+   arg_style => "hashref",
+   members => [
+      map { $_ => member_numeric } qw(
+         rx_packets tx_packets rx_bytes tx_bytes rx_errors tx_errors
+         rx_dropped tx_dropped multicast collisions
+         rx_length_errors rx_over_errors rx_crc_errors rx_frame_errors
+         rx_fifo_errors rx_missed_errors
+         tx_aborted_errors tx_carrier_errors tx_fifo_errors
+         tx_heartbeat_errors tx_window_errors
+         rx_compressed tx_compressed
+      ),
+   ];
+
 constant "RTM_NEWADDR";
 constant "RTM_DELADDR";
 constant "RTM_GETADDR";
@@ -49,6 +65,12 @@ structure "struct ifaddrmsg",
    ];
 
 constant "IFA_$_" for qw( UNSPEC ADDRESS LOCAL LABEL BROADCAST ANYCAST CACHEINFO );
+
+structure "struct ifa_cacheinfo",
+   arg_style => "hashref",
+   members => [
+      map { $_ => member_numeric } qw( ifa_prefered ifa_valid cstamp tstamp ),
+   ];
 
 constant "RTM_NEWROUTE";
 constant "RTM_DELROUTE";
@@ -81,5 +103,35 @@ constant "RT_TABLE_$_" for qw( UNSPEC DEFAULT MAIN LOCAL );
 
 constant "RTA_$_" for qw( UNSPEC DST SRC IIF OIF GATEWAY PRIORITY PREFSRC
    METRICS MULTIPATH PROTOINFO FLOW CACHEINFO );
+
+constant "RTM_NEWNEIGH";
+constant "RTM_DELNEIGH";
+constant "RTM_GETNEIGH";
+
+structure "struct ndmsg",
+   with_tail => 1,
+   members => [
+      ndm_family  => member_numeric,
+      ndm_ifindex => member_numeric,
+      ndm_state   => member_numeric,
+      ndm_flags   => member_numeric,
+      ndm_type    => member_numeric,
+   ];
+
+constant "NUD_$_" for qw( INCOMPLETE REACHABLE STALE DELAY PROBE FAILED NOARP
+   PERMANENT );
+
+constant "NTF_$_" for qw( PROXY ROUTER );
+
+constant "NDA_$_" for qw( UNSPEC DST LLADDR CACHEINFO );
+
+structure "struct nda_cacheinfo",
+   arg_style => "hashref",
+   members => [
+      map { $_ => member_numeric } qw( ndm_confirmed ndm_used ndm_updated ndm_refcnt ),
+   ];
+
+constant "RTMGRP_$_" for qw( LINK NOTIFY NEIGH TC IPV4_IFADDR IPV4_MROUTE
+   IPV4_ROUTE IPV4_RULE IPV6_IFADDR IPV6_MROUTE IPV6_ROUTE IPV6_IFINFO );
 
 write_output $ARGV[0];
