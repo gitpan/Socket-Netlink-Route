@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2010 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2010-2011 -- leonerd@leonerd.org.uk
 
 package IO::Socket::Netlink::Route;
 
@@ -10,7 +10,7 @@ use warnings;
 use IO::Socket::Netlink 0.03;
 use base qw( IO::Socket::Netlink );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
 
@@ -97,7 +97,10 @@ sub unpack_nlattr_mac { join ":", map sprintf("%02x",ord($_)), split //, $_[1] }
 sub   pack_nlattr_dottedhex { die "TODO" }
 sub unpack_nlattr_dottedhex { "0x" . join ".", map sprintf("%02x",ord($_)), split //, $_[1] }
 
-if( eval { require Socket6 } ) {
+if( eval { require Socket && defined &Socket::inet_ntop } ) {
+   *inet_ntop = \&Socket::inet_ntop;
+}
+elsif( eval { require Socket6 } ) {
    *inet_ntop = \&Socket6::inet_ntop;
 }
 else {
@@ -122,7 +125,7 @@ package IO::Socket::Netlink::Route::_IfinfoMsg;
 use base qw( IO::Socket::Netlink::Route::_Message );
 use Socket::Netlink::Route qw( :DEFAULT
    pack_ifinfomsg unpack_ifinfomsg
-   pack_net_device_stats unpack_net_device_stats
+   pack_rtnl_link_stats unpack_rtnl_link_stats
 );
 use Socket qw( AF_UNSPEC );
 
@@ -195,6 +198,8 @@ Provides the following netlink attributes
 
 =item * qdisc => STRING
 
+=item * stats => HASH
+
 =item * txqlen => INT
 
 =item * operstate => INT
@@ -218,8 +223,8 @@ __PACKAGE__->has_nlattrs(
    linkmode  => [ IFLA_LINKMODE,  "u8" ],
 );
 
-sub   pack_nlattr_stats {   pack_net_device_stats $_[1] }
-sub unpack_nlattr_stats { unpack_net_device_stats $_[1] }
+sub   pack_nlattr_stats {   pack_rtnl_link_stats $_[1] }
+sub unpack_nlattr_stats { unpack_rtnl_link_stats $_[1] }
 
 package IO::Socket::Netlink::Route::_IfaddrMsg;
 
@@ -590,11 +595,6 @@ __PACKAGE__->has_nlattrs(
 sub   pack_nlattr_cacheinfo {   pack_nda_cacheinfo $_[1] }
 sub unpack_nlattr_cacheinfo { unpack_nda_cacheinfo $_[1] }
 
-# Keep perl happy; keep Britain tidy
-1;
-
-__END__
-
 =head1 SEE ALSO
 
 =over 4
@@ -617,3 +617,7 @@ F<rtnetlink(7)> - rtnetlink, NETLINK_ROUTE - Linux IPv4 routing socket
 =head1 AUTHOR
 
 Paul Evans <leonerd@leonerd.org.uk>
+
+=cut
+
+0x55AA;

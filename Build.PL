@@ -8,19 +8,16 @@ my $build = Module::Build->new(
    requires => {
       'Socket::Netlink' => '0.03',
    },
-   recommends => {
-      'Socket6' => 0,
-   },
    configure_requires => {
       'Module::Build' => 0,
    },
    build_requires => {
-      'ExtUtils::H2PM' => '0.04',
+      'ExtUtils::H2PM' => '0.07',
       'Module::Build' => 0,
       'Test::More' => 0,
    },
    license => 'perl',
-   create_makefile_pl => 'traditional',
+   create_makefile_pl => 'small',
    create_license => 1,
    create_readme  => 1,
 );

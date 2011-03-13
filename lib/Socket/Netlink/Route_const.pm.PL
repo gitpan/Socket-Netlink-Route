@@ -11,7 +11,7 @@ include "sys/socket.h";
 include "linux/netlink.h";
 include "linux/rtnetlink.h";
 
-include "linux/netdevice.h"; # for struct net_device_stats
+include "linux/if_link.h"; # for struct rtnl_link_stats
 
 use_export;
 
@@ -34,9 +34,12 @@ structure "struct ifinfomsg",
 
 constant "IFLA_$_" for qw( UNSPEC ADDRESS BROADCAST IFNAME MTU LINK QDISC
    STATS COST PRIORITY MASTER WIRELESS PROTINFO TXQLEN MAP WEIGHT OPERSTATE
-   LINKMODE LINKINFO NET_NS_PID IFALIAS );
+   LINKMODE LINKINFO NET_NS_PID );
 
-structure "struct net_device_stats",
+# Later addition
+constant "IFLA_$_", ifdef => "IFLA_$_" for qw( IFALIAS );
+
+structure "struct rtnl_link_stats",
    arg_style => "hashref",
    members => [
       map { $_ => member_numeric } qw(

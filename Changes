@@ -1,5 +1,11 @@
 Revision history for Socket-Netlink-Route
 
+0.03    CHANGES:
+         * Use rtnl_link_stats rather than net_device_stats, because that's
+           the correct structure
+         * Prefer to obtain inet_ntop from Socket rather than Socket6
+         * Optionally skip IFALIAS because older libcs/kernels don't have it
+
 0.02    ADDITIONS:
          * Direct accessors for IfaddrMsg's prefix and RtMsg's src and dst
          * RTM_{NEW,DEL,GET}NEIGH and associated message class

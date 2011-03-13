@@ -8,7 +8,7 @@ package Socket::Netlink::Route;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Exporter 'import';
 
@@ -33,11 +33,6 @@ C<NETLINK_ROUTE> protocol family in F<rtnetlink(7)>
 
 =cut
 
-# Keep perl happy; keep Britain tidy
-1;
-
-__END__
-
 =head1 SEE ALSO
 
 =over 4
@@ -56,3 +51,7 @@ protocol sockets
 =head1 AUTHOR
 
 Paul Evans <leonerd@leonerd.org.uk>
+
+=cut
+
+0x55AA;
