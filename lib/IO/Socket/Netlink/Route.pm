@@ -7,10 +7,10 @@ package IO::Socket::Netlink::Route;
 
 use strict;
 use warnings;
-use IO::Socket::Netlink 0.03;
+use IO::Socket::Netlink 0.04;
 use base qw( IO::Socket::Netlink );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Carp;
 
@@ -65,43 +65,21 @@ use Carp;
 
 use Socket::Netlink::Route qw( :DEFAULT );
 
-# Route messages could have different body structures, depending on the
-# message type. What we'll do is switch up to a more specific subclass when
-# the nlmsg_type is set
+__PACKAGE__->is_subclassed_by_type;
 
-my %type2pkg;
+sub   pack_nlattr_lladdr { pack "C*", map hex($_), split /:/, $_[1] }
+sub unpack_nlattr_lladdr { join ":", map sprintf("%02x",$_), unpack "C*", $_[1] }
 
-sub register_nlmsg_type
-{
-   my $class = shift;
-   my ( $type ) = @_;
-   $type2pkg{$type} = $class;
-}
-
-sub nlmsg_type
-{
-   my $self = shift;
-   my $nlmsg_type = $self->SUPER::nlmsg_type( @_ );
-
-   if( @_ ) {
-      my $pkg = $type2pkg{$nlmsg_type};
-      bless $self, $pkg if $pkg;
-   }
-
-   return $nlmsg_type;
-}
-
-sub   pack_nlattr_mac { join "", map chr(hex $_), split /:/, $_[1] }
-sub unpack_nlattr_mac { join ":", map sprintf("%02x",ord($_)), split //, $_[1] }
-
-sub   pack_nlattr_dottedhex { die "TODO" }
-sub unpack_nlattr_dottedhex { "0x" . join ".", map sprintf("%02x",ord($_)), split //, $_[1] }
+sub   pack_nlattr_dottedhex { pack "C*", map hex($_), split /\./, $_[1] }  # hex() will strip leading 0x on first byte
+sub unpack_nlattr_dottedhex { "0x" . join ".", map sprintf("%02x",$_), unpack "C*", $_[1] }
 
 if( eval { require Socket && defined &Socket::inet_ntop } ) {
    *inet_ntop = \&Socket::inet_ntop;
+   *inet_pton = \&Socket::inet_pton;
 }
 elsif( eval { require Socket6 } ) {
    *inet_ntop = \&Socket6::inet_ntop;
+   *inet_pton = \&Socket6::inet_pton;
 }
 else {
    require Socket;
@@ -110,9 +88,20 @@ else {
       return Socket::inet_ntoa($addr) if $family == Socket::AF_INET();
       return undef;
    };
+   *inet_pton = sub {
+      my ( $family, $protaddr ) = @_;
+      return Socket::inet_aton($protaddr) if $family == Socket::AF_INET();
+      return undef;
+   };
 }
 
-sub pack_nlattr_protaddr { die "TODO" }
+sub pack_nlattr_protaddr
+{
+   my ( $self, $protaddr ) = @_;
+   eval { defined $self->family and inet_pton( $self->family, $protaddr ) }
+      or $self->pack_nlattr_dottedhex( $protaddr );
+}
+
 sub unpack_nlattr_protaddr
 {
    my ( $self, $addr ) = @_;
@@ -120,12 +109,22 @@ sub unpack_nlattr_protaddr
       or $self->unpack_nlattr_dottedhex( $addr );
 }
 
+# Debug support
+my @TYPES = grep m/^RTM_/, @Socket::Netlink::Route::EXPORT;
+
+sub nlmsg_type_string
+{
+   my $self = shift;
+   my $type = $self->nlmsg_type;
+   $type == $self->$_ and return $_ for @TYPES;
+   return $self->SUPER::nlmsg_type_string;
+}
+
 package IO::Socket::Netlink::Route::_IfinfoMsg;
 
 use base qw( IO::Socket::Netlink::Route::_Message );
 use Socket::Netlink::Route qw( :DEFAULT
    pack_ifinfomsg unpack_ifinfomsg
-   pack_rtnl_link_stats unpack_rtnl_link_stats
 );
 use Socket qw( AF_UNSPEC );
 
@@ -212,8 +211,8 @@ Provides the following netlink attributes
 
 __PACKAGE__->has_nlattrs(
    "ifinfo",
-   address   => [ IFLA_ADDRESS,   "mac" ],
-   broadcast => [ IFLA_BROADCAST, "mac" ],
+   address   => [ IFLA_ADDRESS,   "lladdr" ],
+   broadcast => [ IFLA_BROADCAST, "lladdr" ],
    ifname    => [ IFLA_IFNAME,    "asciiz" ],
    mtu       => [ IFLA_MTU,       "u32" ],
    qdisc     => [ IFLA_QDISC,     "asciiz" ],
@@ -223,8 +222,16 @@ __PACKAGE__->has_nlattrs(
    linkmode  => [ IFLA_LINKMODE,  "u8" ],
 );
 
-sub   pack_nlattr_stats {   pack_rtnl_link_stats $_[1] }
-sub unpack_nlattr_stats { unpack_rtnl_link_stats $_[1] }
+BEGIN {
+   if( defined &Socket::Netlink::Route::pack_rtnl_link_stats ) {
+      *pack_nlattr_stats   = sub { Socket::Netlink::Route::pack_rtnl_link_stats $_[1] };
+      *unpack_nlattr_stats = sub { Socket::Netlink::Route::unpack_rtnl_link_stats $_[1] };
+   }
+   else {
+      # Just pass raw bytes
+      *pack_nlattr_stats = *unpack_nlattr_stats = sub { $_[1] };
+   }
+}
 
 package IO::Socket::Netlink::Route::_IfaddrMsg;
 
@@ -588,7 +595,7 @@ Provides the following netlink attributes
 __PACKAGE__->has_nlattrs(
    "ndm",
    dst       => [ NDA_DST,       "protaddr" ],
-   lladdr    => [ NDA_LLADDR,    "mac" ],
+   lladdr    => [ NDA_LLADDR,    "lladdr" ],
    cacheinfo => [ NDA_CACHEINFO, "cacheinfo" ],
 );
 

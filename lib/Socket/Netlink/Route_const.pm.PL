@@ -4,6 +4,19 @@ use strict;
 use warnings;
 
 use ExtUtils::H2PM 0.04;
+use ExtUtils::CChecker;
+
+my $cc = ExtUtils::CChecker->new;
+
+my $HAVE_IF_LINK = $cc->try_compile_run(
+   source => <<EOF );
+#include <sys/socket.h>
+#include <linux/if_link.h>
+int main(int argc, char *argv[]) {
+  struct rtnl_link_stats stats;
+  return 0;
+}
+EOF
 
 module "Socket::Netlink::Route";
 
@@ -11,7 +24,9 @@ include "sys/socket.h";
 include "linux/netlink.h";
 include "linux/rtnetlink.h";
 
-include "linux/if_link.h"; # for struct rtnl_link_stats
+if( $HAVE_IF_LINK ) {
+   include "linux/if_link.h"; # for struct rtnl_link_stats
+}
 
 use_export;
 
@@ -39,19 +54,21 @@ constant "IFLA_$_" for qw( UNSPEC ADDRESS BROADCAST IFNAME MTU LINK QDISC
 # Later addition
 constant "IFLA_$_", ifdef => "IFLA_$_" for qw( IFALIAS );
 
-structure "struct rtnl_link_stats",
-   arg_style => "hashref",
-   members => [
-      map { $_ => member_numeric } qw(
-         rx_packets tx_packets rx_bytes tx_bytes rx_errors tx_errors
-         rx_dropped tx_dropped multicast collisions
-         rx_length_errors rx_over_errors rx_crc_errors rx_frame_errors
-         rx_fifo_errors rx_missed_errors
-         tx_aborted_errors tx_carrier_errors tx_fifo_errors
-         tx_heartbeat_errors tx_window_errors
-         rx_compressed tx_compressed
-      ),
-   ];
+if( $HAVE_IF_LINK ) {
+   structure "struct rtnl_link_stats",
+      arg_style => "hashref",
+      members => [
+         map { $_ => member_numeric } qw(
+            rx_packets tx_packets rx_bytes tx_bytes rx_errors tx_errors
+            rx_dropped tx_dropped multicast collisions
+            rx_length_errors rx_over_errors rx_crc_errors rx_frame_errors
+            rx_fifo_errors rx_missed_errors
+            tx_aborted_errors tx_carrier_errors tx_fifo_errors
+            tx_heartbeat_errors tx_window_errors
+            rx_compressed tx_compressed
+         ),
+      ];
+}
 
 constant "RTM_NEWADDR";
 constant "RTM_DELADDR";

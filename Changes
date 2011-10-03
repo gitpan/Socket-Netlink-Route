@@ -1,5 +1,10 @@
 Revision history for Socket-Netlink-Route
 
+0.04    CHANGES:
+         * Renamed 'mac' to 'lladdr'
+         * Implemented nlattr packing functions
+         * Updated for IO::Socket::Netlink 0.04
+
 0.03    CHANGES:
          * Use rtnl_link_stats rather than net_device_stats, because that's
            the correct structure
