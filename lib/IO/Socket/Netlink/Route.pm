@@ -10,7 +10,7 @@ use warnings;
 use IO::Socket::Netlink 0.04;
 use base qw( IO::Socket::Netlink );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 
@@ -218,8 +218,10 @@ __PACKAGE__->has_nlattrs(
    qdisc     => [ IFLA_QDISC,     "asciiz" ],
    stats     => [ IFLA_STATS,     "stats" ],
    txqlen    => [ IFLA_TXQLEN,    "u32" ],
+   map       => [ IFLA_MAP,       "raw" ],
    operstate => [ IFLA_OPERSTATE, "u8" ],
    linkmode  => [ IFLA_LINKMODE,  "u8" ],
+   linkinfo  => [ IFLA_LINKINFO,  "linkinfo" ],
 );
 
 BEGIN {
@@ -232,6 +234,9 @@ BEGIN {
       *pack_nlattr_stats = *unpack_nlattr_stats = sub { $_[1] };
    }
 }
+
+sub   pack_nlattr_linkinfo { die }
+sub unpack_nlattr_linkinfo { "LINKINFO" }
 
 package IO::Socket::Netlink::Route::_IfaddrMsg;
 
@@ -349,7 +354,7 @@ sub prefix
    if( @_ ) {
       my ( $addr, $len ) = $_[0] =~ m{^(.*)/(\d+)$} or
          croak "Expected 'ADDRESS/PREFIXLEN'";
-      $self->set_nlattrs( address => $addr );
+      $self->change_nlattrs( address => $addr );
       $self->ifa_prefixlen( $len );
    }
    else {
@@ -492,11 +497,11 @@ sub _srcdst
       if( defined $_[0] ) {
          my ( $addr, $len ) = $_[0] =~ m{^(.*)/(\d+)$} or
             croak "Expected 'ADDRESS/PREFIXLEN'";
-         $self->set_nlattrs( $type => $addr );
+         $self->change_nlattrs( $type => $addr );
          $self->$rtm_len( $len );
       }
       else {
-         $self->set_nlattrs( $type => undef );
+         $self->change_nlattrs( $type => undef );
          $self->$rtm_len( 0 );
       }
    }

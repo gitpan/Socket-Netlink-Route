@@ -10,7 +10,7 @@ build_requires:
 configure_requires:
   Module::Build: 0
 dynamic_config: 1
-generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112150'
+generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.120630'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -19,13 +19,13 @@ name: Socket-Netlink-Route
 provides:
   IO::Socket::Netlink::Route:
     file: lib/IO/Socket/Netlink/Route.pm
-    version: 0.04
+    version: 0.05
   Socket::Netlink::Route:
     file: lib/Socket/Netlink/Route.pm
-    version: 0.04
+    version: 0.05
 requires:
   Exporter: 5.57
   Socket::Netlink: 0.04
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.04
+version: 0.05
